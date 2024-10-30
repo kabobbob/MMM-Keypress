@@ -1,9 +1,5 @@
 Module.register("MMM-Keypress", {
   defaults: {
-    notifications: [
-      {key: 39, notification: "ARTICLE_NEXT"}, // Key code 39 corresponds to the right arrow key
-      {key: 37, notification: "ARTICLE_PREVIOUS"} // Key code 37 corresponds to the left arrow key
-    ]
   },
 
   start () {
@@ -13,6 +9,8 @@ Module.register("MMM-Keypress", {
     // Add event listeners for both "keydown" and "scroll wheel" events
     document.addEventListener("keydown", this.handleKeyEvent.bind(this));
     document.addEventListener("wheel", this.handleWheelEvent.bind(this));
+    document.addEventListener("touchstart", this.touchStartHandler.bind(this));
+    document.addEventListener("touchend", this.touchEndHandler.bind(this));
   },
 
   getDom () {
@@ -47,5 +45,52 @@ Module.register("MMM-Keypress", {
     if (matchingNotification) {
       this.sendNotification(matchingNotification.notification, matchingNotification.payload);
     }
-  }
+  },
+
+  touchStartX: 0,
+  touchEndX: 0,
+
+  touchStartHandler (event) {
+    this.touchStartX = event.changedTouches[0].screenX;
+  },
+
+  touchEndHandler (event) {
+    this.touchEndX = event.changedTouches[0].screenX;
+    this.handleSwipeEvent();
+  },
+
+  handleSwipeEvent () {
+    var difference = this.touchEndX - this.touchStartX;
+    var threshold = 50;  // You can adjust the threshold as required
+    let key;
+
+    if (difference > threshold) {
+      key = "ARROWLEFT";
+    } else if (difference < -threshold) {
+      key = "ARROWRIGHT";
+    }
+
+    const matchingNotification = this.config.notifications.find((notification) => notification.key === key);
+    if (matchingNotification) {
+      let curWeekIndex, weeksInView,
+      newWeekIndex;
+
+      this.sendNotification('CX3_GET_CONFIG', {
+        callback (current) {
+          curWeekIndex = current.weekIndex;
+          weeksInView  = current.weeksInView;
+        }
+      })
+
+      if (matchingNotification.notification == "CALENDAR_ADVANCE") {
+        newWeekIndex = curWeekIndex + weeksInView;
+      } else if (matchingNotification.notification == "CALENDAR_REWIND") {
+        newWeekIndex = curWeekIndex - weeksInView;
+      }
+
+      this.sendNotification('CX3_SET_CONFIG', { weekIndex: newWeekIndex });
+    }
+  },
+
 });
+
